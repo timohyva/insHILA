@@ -416,6 +416,7 @@ Field<T>::start_gather(Direction d,
             sendit = false;
 
         } else {
+            gpuStreamSynchronize(stream);
             gpuStreamDestroy(stream);
         }
 
@@ -529,6 +530,7 @@ void Field<T>::wait_gather(Direction d,
             if (streams != nullptr) {
                 (*streams).push_back(s);
             } else {
+                gpuStreamSynchronize(s);
                 gpuStreamDestroy(s);
             }
 #else

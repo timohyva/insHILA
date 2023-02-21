@@ -303,6 +303,7 @@ void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
     hila::out0 << "wait and send " << data_vector.size() << '\n';
 
     for (auto &r : data_vector) {
+        gpuStreamSynchronize(r.stream);
         gpuStreamDestroy(r.stream);
 
         start_send_timer.start();
@@ -318,8 +319,10 @@ void wait_unpack_halos(std::vector<gpuStream_t> &streams) {
 
     hila::out0 << "wait unpack " << streams.size() << '\n';
 
-    for (auto & r : streams)
+    for (auto & r : streams) {
+        gpuStreamSynchronize(r);
         gpuStreamDestroy(r);
+    }
 
 }
 
