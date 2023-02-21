@@ -73,6 +73,8 @@ std::string TopLevelVisitor::generate_code_cuda(Stmt *S, bool semicolon_at_end, 
     // indexing variable
     extern std::string looping_var;
 
+    bool gpu_aware_mpi = is_macro_defined("GPU_AWARE_MPI");
+    bool first = true;
 
     // Get kernel name - use line number or file offset (must be deterministic)
     std::string kernel_name = TopLevelVisitor::make_kernel_name();
@@ -83,14 +85,34 @@ std::string TopLevelVisitor::generate_code_cuda(Stmt *S, bool semicolon_at_end, 
         if (!l.is_loop_local_dir) {
             for (dir_ptr &d : l.dir_list)
                 if (d.count > 0) {
+                    if (first && gpu_aware_mpi) {
+                        code << "std::vector<gpuStream_t> streams;\n";
+                        first = false;
+                    }
                     code << l.new_name << ".wait_gather(" << d.direxpr_s << ", "
-                         << loop_info.parity_str << ");\n";
+                         << loop_info.parity_str;
+                    if (gpu_aware_mpi)
+                        code << ", &streams";
+
+                    code << ");\n";
                 }
         } else {
+            if (first && gpu_aware_mpi) {
+                code << "std::vector<gpuStream_t> streams;\n";
+                first = false;
+            }
             code << "for (Direction _HILAdir_ = (Direction)0; _HILAdir_ < NDIRS; "
                     "++_HILAdir_) {\n"
-                 << l.new_name << ".wait_gather(_HILAdir_," << loop_info.parity_str << ");\n}\n";
+                 << l.new_name << ".wait_gather(_HILAdir_," << loop_info.parity_str;
+            if (gpu_aware_mpi)
+                code << ", &streams";
+
+            code << ");\n}\n";
         }
+    }
+
+    if (!first && gpu_aware_mpi) {
+        code << "wait_unpack_halos(streams);\n";
     }
 
     // Set loop lattice
@@ -749,7 +771,6 @@ std::string TopLevelVisitor::generate_code_cuda(Stmt *S, bool semicolon_at_end, 
     }
 
     // and the selection vars
-    bool first = true;
     for (selection_info &s : selection_info_list) {
         if (s.previous_selection == nullptr) {
             // "reduce" the flagged arrays using cub functi

@@ -174,6 +174,8 @@ void TopLevelVisitor::generate_code(Stmt *S) {
     else
         generate_wait_loops = true;
 
+    bool gpu_aware_mpi = is_macro_defined("GPU_AWARE_MPI");
+
     for (field_info &l : field_info_list) {
         // If neighbour references exist, communicate them
         if (!l.is_loop_local_dir) {
@@ -184,12 +186,21 @@ void TopLevelVisitor::generate_code(Stmt *S) {
                         code << l.new_name << ".gather(" << d.direxpr_s << ", "
                              << loop_info.parity_str << ");\n";
                     } else {
-                        if (first)
+                        if (first) {
                             code << "dir_mask_t  _dir_mask_ = 0;\n";
-                        first = false;
+                            if (gpu_aware_mpi) {
+                                code << "std::vector<send_data_list_t> _send_halo_data;\n";
+                            }
+                            first = false;
+                        }
 
                         code << "_dir_mask_ |= " << l.new_name << ".start_gather(" << d.direxpr_s
-                             << ", " << loop_info.parity_str << ");\n";
+                             << ", " << loop_info.parity_str;
+
+                        if (gpu_aware_mpi)
+                            code << ", &_send_halo_data";
+
+                        code << ");\n";
                     }
                 }
         } else {
@@ -201,18 +212,27 @@ void TopLevelVisitor::generate_code(Stmt *S) {
                      << l.new_name << ".start_gather(_HILAdir_," << loop_info.parity_str
                      << ");\n}\n";
             } else {
-                if (first)
+                if (first) {
                     code << "dir_mask_t  _dir_mask_ = 0;\n";
-                first = false;
+                    if (gpu_aware_mpi) {
+                        code << "std::vector<send_data_list_t> _send_halo_data;\n";
+                    }
+                    first = false;
+                }
                 code << "for (Direction _HILAdir_ = (Direction)0; _HILAdir_ < NDIRS; "
                         "++_HILAdir_) {\n"
                      << "_dir_mask_ |= " << l.new_name << ".start_gather(_HILAdir_,"
-                     << loop_info.parity_str << ");\n}\n";
+                     << loop_info.parity_str;
+                if (gpu_aware_mpi)
+                    code << ", &_send_halo_data";
+
+                code << ");\n}\n";
             }
         }
     }
 
-    // write wait gathers here also
+
+    // write wait gathers here also if not wait loops
     if (!generate_wait_loops)
         for (field_info &l : field_info_list)
             if (l.is_loop_local_dir) {
@@ -224,6 +244,12 @@ void TopLevelVisitor::generate_code(Stmt *S) {
 
     if (first)
         generate_wait_loops = false; // no communication needed in the 1st place
+
+    // do mpi sends only here
+    if (gpu_aware_mpi && !first) {
+        code << "wait_pack_and_send_halos(_send_halo_data);\n";
+    }
+
 
     // Create temporary variables for reductions
     for (var_info &v : var_info_list) {
