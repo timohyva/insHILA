@@ -33,6 +33,8 @@ void gpu_memory_pool_report();
 using gpuError = cudaError;
 #define gpuSuccess cudaSuccess
 
+using gpuStream_t = cudaStream_t;
+
 /////////////////////////////////////////////
 // If gpu memory pool in use, the interface to memory
 #ifdef GPU_MEMORY_POOL
@@ -69,6 +71,8 @@ using gpuError = cudaError;
 #define gpuMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define gpuDeviceSynchronize() GPU_CHECK(cudaDeviceSynchronize())
 #define gpuStreamSynchronize(a) GPU_CHECK(cudaStreamSynchronize(a))
+#define gpuStreamCreate(a) GPU_CHECK(cudaStreamCreate(a))
+#define gpuStreamDestroy(a) GPU_CHECK(cudaStreamDestroy(a))
 
 #define GPUTYPESTR "CUDA"
 
@@ -91,6 +95,8 @@ using gpuError = cudaError;
 
 using gpuError = hipError_t;
 #define gpuSuccess hipSuccess
+
+using gpuStream_t = hipStream_t;
 
 /////////////////////////////////////////////
 // If gpu memory pool in use, the interface to memory
@@ -120,6 +126,8 @@ using gpuError = hipError_t;
 #define gpuMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define gpuDeviceSynchronize() GPU_CHECK(hipDeviceSynchronize())
 #define gpuStreamSynchronize(a) GPU_CHECK(hipStreamSynchronize(a))
+#define gpuStreamCreate(a) GPU_CHECK(hipStreamCreate(a))
+#define gpuStreamDestroy(a) GPU_CHECK(hipStreamDestroy(a))
 
 #define GPUTYPESTR "HIP"
 
@@ -167,6 +175,7 @@ void seed_device_rng(unsigned long long seed);
 } // namespace hila
 
 using gpuError = int;
+using gpuStream_t = int;
 
 // Define empty stubs - return 1 (true)
 // clang-format off
@@ -181,6 +190,8 @@ using gpuError = int;
 
 #define gpuStreamSynchronize(a) do {} while(0)
 #define gpuDeviceSynchronize() do {} while(0)
+#define gpuStreamCreate(a) do {} while(0)
+#define gpuStreamDestroy(a) do {} while(0)
 // clang-format on
 
 
