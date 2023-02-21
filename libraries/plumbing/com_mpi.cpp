@@ -294,6 +294,38 @@ void split_into_partitions(int this_lattice) {
     MPI_Comm_size(lattice.mpi_comm_lat, &lattice.nodes.number);
 }
 
+
+#ifdef GPU_AWARE_MPI
+
+/// Wait for the pack kernels and send data -- used in gpu code
+void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
+
+    hila::out0 << "wait and send " << data_vector.size() << '\n';
+
+    for (auto &r : data_vector) {
+        gpuStreamDestroy(r.stream);
+
+        start_send_timer.start();
+
+        MPI_Isend(r.buf, r.size, r.mpi_type, r.to_rank, r.tag, lattice.mpi_comm_lat, r.req);
+
+        start_send_timer.stop();
+    }
+}
+
+/// and wait for unpack streams
+void wait_unpack_halos(std::vector<gpuStream_t> &streams) {
+
+    hila::out0 << "wait unpack " << streams.size() << '\n';
+
+    for (auto & r : streams)
+        gpuStreamDestroy(r);
+
+}
+
+#endif
+
+
 #if 0
 
 // Switch comm frame global-sublat

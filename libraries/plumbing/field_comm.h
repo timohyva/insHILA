@@ -11,10 +11,32 @@
 /// Gather boundary elements for communication
 
 template <typename T>
-void Field<T>::field_struct::gather_comm_elements(
-    Direction d, Parity par, T *RESTRICT buffer,
-    const lattice_struct::comm_node_struct &to_node) const {
-#ifndef VECTORIZED
+void Field<T>::field_struct::gather_comm_elements(Direction d, Parity par, T *RESTRICT buffer,
+                                                  const lattice_struct::comm_node_struct &to_node
+                                                      IF_GPU_AWARE(gpuStream_t &stream)) const {
+
+
+#if defined(CUDA) || defined(HIP)
+#ifdef GPU_AWARE_MPI
+    gpuStreamCreate(&stream);
+#else
+    gpuStream_t stream = 0;
+#endif
+
+#ifdef SPECIAL_BOUNDARY_CONDITIONS
+    // note: -d in is_on_edge, because we're about to send stuff to that
+    // Direction (gathering from Direction +d)
+    if (boundary_condition[d] == hila::bc::ANTIPERIODIC && lattice.mynode.is_on_edge(-d)) {
+        payload.gather_comm_elements(buffer, to_node, par, lattice, true, stream);
+    } else {
+        payload.gather_comm_elements(buffer, to_node, par, lattice, false, stream);
+    }
+#else
+    payload.gather_comm_elements(buffer, to_node, par, lattice, false, stream);
+#endif
+
+#elif !defined(VECTORIZED)
+
 #ifdef SPECIAL_BOUNDARY_CONDITIONS
     // note: -d in is_on_edge, because we're about to send stuff to that
     // Direction (gathering from Direction +d)
@@ -68,9 +90,9 @@ void Field<T>::field_struct::gather_comm_elements(
 /// Place boundary elements from neighbour
 
 template <typename T>
-void Field<T>::field_struct::place_comm_elements(
-    Direction d, Parity par, T *RESTRICT buffer,
-    const lattice_struct::comm_node_struct &from_node) {
+void Field<T>::field_struct::place_comm_elements(Direction d, Parity par, T *RESTRICT buffer,
+                                                 const lattice_struct::comm_node_struct &from_node
+                                                     IF_GPU_AWARE(gpuStream_t &stream)) {
 
 #ifdef VECTORIZED
     if constexpr (hila::is_vectorizable_type<T>::value) {
@@ -85,7 +107,11 @@ void Field<T>::field_struct::place_comm_elements(
     }
 #else
     // this one is only for CUDA
-    payload.place_comm_elements(d, par, buffer, from_node, lattice);
+#ifdef GPU_AWARE_MPI
+    payload.place_comm_elements(d, par, buffer, from_node, lattice, stream);
+#else
+    payload.place_comm_elements(d, par, buffer, from_node, lattice, 0);
+#endif
 #endif
     // #endif
 }
@@ -258,11 +284,14 @@ Field<T> &Field<T>::shift(const CoordinateVector &v, Field<T> &res, const Parity
 
 #endif // NAIVE_SHIFT
 
+
 /// start_gather(): Communicate the field at Parity par from Direction
 /// d. Uses accessors to prevent dependency on the layout.
 /// return the Direction mask bits where something is happening
 template <typename T>
-dir_mask_t Field<T>::start_gather(Direction d, Parity p) const {
+dir_mask_t
+Field<T>::start_gather(Direction d,
+                       Parity p IF_GPU_AWARE(std::vector<send_data_list_t> *data_vector)) const {
 
     // get the mpi message tag right away, to ensure that we are always synchronized
     // with the mpi calls -- some nodes might not need comms, but the tags must be in
@@ -349,6 +378,11 @@ dir_mask_t Field<T>::start_gather(Direction d, Parity p) const {
         post_receive_timer.stop();
     }
 
+#ifdef GPU_AWARE_MPI
+    gpuStreamSynchronize(0);
+    // gpuDeviceSynchronize();
+#endif
+
     if (to_node.rank != hila::myrank() && boundary_need_to_communicate(-d)) {
         // HANDLE SENDS: Copy Field elements on the boundary to a send buffer and send
 
@@ -359,21 +393,42 @@ dir_mask_t Field<T>::start_gather(Direction d, Parity p) const {
 
         send_buffer = fs->send_buffer[d] + to_node.offset(par);
 
+        size_t n = sites * size / size_type;
+
+#ifndef GPU_AWARE_MPI
         fs->gather_comm_elements(d, par, send_buffer, to_node);
 
-        size_t n = sites * size / size_type;
-#ifdef GPU_AWARE_MPI
-        gpuStreamSynchronize(0);
-        //gpuDeviceSynchronize();
+#else
+        gpuStream_t stream;
+        fs->gather_comm_elements(d, par, send_buffer, to_node, stream);
+
+        bool sendit = true;
+        if (data_vector != nullptr) {
+            send_data_list_t dlist;
+            dlist.buf = send_buffer;
+            dlist.size = n;
+            dlist.mpi_type = mpi_type;
+            dlist.to_rank = to_node.rank;
+            dlist.tag = tag;
+            dlist.req = &fs->send_request[par_i][d];
+            dlist.stream = stream;
+            (*data_vector).push_back(dlist);
+            sendit = false;
+
+        } else {
+            gpuStreamDestroy(stream);
+        }
+
+        if (sendit)
 #endif
+        {
+            start_send_timer.start();
 
-        start_send_timer.start();
+            MPI_Isend(send_buffer, (int)n, mpi_type, to_node.rank, tag, lattice.mpi_comm_lat,
+                      &fs->send_request[par_i][d]);
 
-        MPI_Isend(send_buffer, (int)n, mpi_type, to_node.rank, tag, lattice.mpi_comm_lat,
-                  &fs->send_request[par_i][d]);
-
-        start_send_timer.stop();
-
+            start_send_timer.stop();
+        }
     }
 
     // and do the boundary shuffle here, after MPI has started
@@ -385,6 +440,7 @@ dir_mask_t Field<T>::start_gather(Direction d, Parity p) const {
     return get_dir_mask(d);
 }
 
+
 ///  wait_gather(): Wait for communication at parity par from
 ///  Direction d completes the communication in the function.
 ///  If the communication has not started yet, also calls
@@ -395,7 +451,8 @@ dir_mask_t Field<T>::start_gather(Direction d, Parity p) const {
 ///  the internal content of the field, the halo. From the point
 ///  of view of the user, the value of the field does not change.
 template <typename T>
-void Field<T>::wait_gather(Direction d, Parity p) const {
+void Field<T>::wait_gather(Direction d,
+                           Parity p IF_GPU_AWARE(std::vector<gpuStream_t> *streams)) const {
 
     lattice_struct::nn_comminfo_struct &ci = lattice.nn_comminfo[d];
     lattice_struct::comm_node_struct &from_node = ci.from_node;
@@ -465,7 +522,18 @@ void Field<T>::wait_gather(Direction d, Parity p) const {
             wait_receive_timer.stop();
 
 #ifndef VANILLA
+#ifdef GPU_AWARE_MPI
+            gpuStream_t s;
+            fs->place_comm_elements(d, par, fs->get_receive_buffer(d, par, from_node), from_node,
+                                    s);
+            if (streams != nullptr) {
+                (*streams).push_back(s);
+            } else {
+                gpuStreamDestroy(s);
+            }
+#else
             fs->place_comm_elements(d, par, fs->get_receive_buffer(d, par, from_node), from_node);
+#endif
 #endif
         }
 

@@ -29,6 +29,22 @@ void ensure_field_operators_exist();
 
 #include "plumbing/ensure_loop_functions.h"
 
+/// helper class, should be defined somewhere else
+#ifdef GPU_AWARE_MPI
+struct send_data_list_t {
+    void *buf;
+    int size, to_rank, tag;
+    MPI_Datatype mpi_type;
+    MPI_Request *req;
+    gpuStream_t stream;
+};
+
+void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector);
+void wait_unpack_halos(std::vector<gpuStream_t> &streams);
+
+#endif
+
+
 /// Field class
 /// This implements the standard methods for accessing fields
 /// Hilapp replaces the parity access patterns, Field[par] with a loop over
@@ -177,11 +193,13 @@ class Field {
 
         /// Gather boundary elements for communication
         void gather_comm_elements(Direction d, Parity par, T *RESTRICT buffer,
-                                  const lattice_struct::comm_node_struct &to_node) const;
+                                  const lattice_struct::comm_node_struct &to_node
+                                      IF_GPU_AWARE(gpuStream_t &stream)) const;
 
         /// Place boundary elements from neighbour
         void place_comm_elements(Direction d, Parity par, T *RESTRICT buffer,
-                                 const lattice_struct::comm_node_struct &from_node);
+                                 const lattice_struct::comm_node_struct &from_node
+                                     IF_GPU_AWARE(gpuStream_t &stream));
 
         /// Place boundary elements from local lattice (used in vectorized version)
         void set_local_boundary_elements(Direction dir, Parity par);
@@ -697,9 +715,16 @@ class Field {
 
     ///////////////////////////////////////////////////////////////////////
 
+
     // Communication routines
-    dir_mask_t start_gather(Direction d, Parity p = ALL) const;
-    void wait_gather(Direction d, Parity p) const;
+
+
+    dir_mask_t
+    start_gather(Direction d,
+                 Parity p = ALL IF_GPU_AWARE(std::vector<send_data_list_t> *dat = nullptr)) const;
+    void
+    wait_gather(Direction d,
+                Parity p = ALL IF_GPU_AWARE(std::vector<gpuStream_t> *streams = nullptr)) const;
     void gather(Direction d, Parity p = ALL) const;
     void drop_comms(Direction d, Parity p) const;
     void cancel_comm(Direction d, Parity p) const;

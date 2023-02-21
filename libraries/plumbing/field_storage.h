@@ -18,6 +18,12 @@ class field_struct;
 #define DEVICE
 #endif
 
+#ifdef GPU_AWARE_MPI
+#define IF_GPU_AWARE(a) , a
+#else
+#define IF_GPU_AWARE(a)
+#endif
+
 ////////////////////////////////////////////////////////////////////////
 /// The field_storage struct contains minimal information for using
 /// the field in a loop. It is communicated to CUDA kernels and other
@@ -70,7 +76,8 @@ class field_storage {
 #endif
 
     void gather_comm_elements(T *RESTRICT buffer, const lattice_struct::comm_node_struct &to_node,
-                              Parity par, const lattice_struct &lattice, bool antiperiodic) const;
+                              Parity par, const lattice_struct &lattice, bool antiperiodic 
+                              IF_GPU_AWARE(gpuStream_t stream = 0)) const;
 
     void gather_elements(T *RESTRICT buffer, const unsigned *RESTRICT index_list, int n,
                          const lattice_struct &lattice) const;
@@ -81,7 +88,7 @@ class field_storage {
     /// Place boundary elements from neighbour
     void place_comm_elements(Direction d, Parity par, T *RESTRICT buffer,
                              const lattice_struct::comm_node_struct &from_node,
-                             const lattice_struct &lattice);
+                             const lattice_struct &lattice IF_GPU_AWARE(gpuStream_t stream = 0));
     void place_elements(T *RESTRICT buffer, const unsigned *RESTRICT index_list, int n,
                         const lattice_struct &lattice);
     /// Place boundary elements from local lattice (used in vectorized version)
