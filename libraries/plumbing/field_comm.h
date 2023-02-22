@@ -415,6 +415,8 @@ Field<T>::start_gather(Direction d,
             (*data_vector).push_back(dlist);
             sendit = false;
 
+            hila::out0 << "Data gathered, buffering " << std::endl;
+
         } else {
             gpuStreamSynchronize(stream);
             gpuStreamDestroy(stream);
