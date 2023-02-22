@@ -108,6 +108,8 @@ void Field<T>::field_struct::place_comm_elements(Direction d, Parity par, T *RES
 #else
     // this one is only for CUDA
 #ifdef GPU_AWARE_MPI
+    gpuStreamCreate(&stream);
+
     payload.place_comm_elements(d, par, buffer, from_node, lattice, stream);
 #else
     payload.place_comm_elements(d, par, buffer, from_node, lattice, 0);
@@ -415,7 +417,7 @@ Field<T>::start_gather(Direction d,
             (*data_vector).push_back(dlist);
             sendit = false;
 
-            hila::out0 << "Data gathered, buffering " << std::endl;
+            //  hila::out0 << "Data gathered, buffering " << std::endl;
 
         } else {
             gpuStreamSynchronize(stream);

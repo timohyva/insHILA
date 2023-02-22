@@ -409,6 +409,7 @@ void field_storage<T>::place_comm_elements(Direction d, Parity par, T *buffer,
     unsigned N_blocks = n / N_threads + 1;
     place_comm_elements_kernel<<<N_blocks, N_threads,0,stream>>>((*this), d_buffer, from_node.offset(par), n,
                                                         lattice.field_alloc_size());
+    check_device_error("place elements");
 
 #ifndef GPU_AWARE_MPI
     gpuFree(d_buffer);

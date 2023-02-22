@@ -85,14 +85,14 @@ void hila_reduce_sums() {
         reduction_timer.start();
 
         if (allreduce_on) {
-            MPI_Allreduce((void *)double_reduction_buffer.data(), work, n_double,
-                          MPI_DOUBLE, MPI_SUM, lattice.mpi_comm_lat);
+            MPI_Allreduce((void *)double_reduction_buffer.data(), work, n_double, MPI_DOUBLE,
+                          MPI_SUM, lattice.mpi_comm_lat);
             for (int i = 0; i < n_double; i++)
                 *(double_reduction_ptrs[i]) = work[i];
 
         } else {
-            MPI_Reduce((void *)double_reduction_buffer.data(), work, n_double,
-                       MPI_DOUBLE, MPI_SUM, 0, lattice.mpi_comm_lat);
+            MPI_Reduce((void *)double_reduction_buffer.data(), work, n_double, MPI_DOUBLE, MPI_SUM,
+                       0, lattice.mpi_comm_lat);
             if (hila::myrank() == 0)
                 for (int i = 0; i < n_double; i++)
                     *(double_reduction_ptrs[i]) = work[i];
@@ -109,14 +109,14 @@ void hila_reduce_sums() {
         reduction_timer.start();
 
         if (allreduce_on) {
-            MPI_Allreduce((void *)float_reduction_buffer.data(), work, n_float,
-                          MPI_FLOAT, MPI_SUM, lattice.mpi_comm_lat);
+            MPI_Allreduce((void *)float_reduction_buffer.data(), work, n_float, MPI_FLOAT, MPI_SUM,
+                          lattice.mpi_comm_lat);
             for (int i = 0; i < n_float; i++)
                 *(float_reduction_ptrs[i]) = work[i];
 
         } else {
-            MPI_Reduce((void *)float_reduction_buffer.data(), work, n_float, MPI_FLOAT,
-                       MPI_SUM, 0, lattice.mpi_comm_lat);
+            MPI_Reduce((void *)float_reduction_buffer.data(), work, n_float, MPI_FLOAT, MPI_SUM, 0,
+                       lattice.mpi_comm_lat);
             if (hila::myrank() == 0)
                 for (int i = 0; i < n_float; i++)
                     *(float_reduction_ptrs[i]) = work[i];
@@ -154,7 +154,7 @@ void initialize_communications(int &argc, char ***argv) {
         int provided;
         MPI_Init_thread(&argc, argv, MPI_THREAD_FUNNELED, &provided);
         if (provided < MPI_THREAD_FUNNELED) {
-            if (hila::myrank() == 0) 
+            if (hila::myrank() == 0)
                 hila::out << "MPI could not provide MPI_THREAD_FUNNELED, exiting\n";
             MPI_Finalize();
             exit(1);
@@ -201,7 +201,7 @@ void hila::broadcast(std::string &var, int rank) {
         return;
 
     int size = var.size();
-    hila::broadcast(size,rank);
+    hila::broadcast(size, rank);
 
     if (hila::myrank() != rank) {
         var.resize(size, ' ');
@@ -218,11 +218,11 @@ void hila::broadcast(std::vector<std::string> &list, int rank) {
         return;
 
     int size = list.size();
-    hila::broadcast(size,rank);
+    hila::broadcast(size, rank);
     list.resize(size);
 
     for (auto &s : list) {
-        hila::broadcast(s,rank);
+        hila::broadcast(s, rank);
     }
 }
 
@@ -284,8 +284,7 @@ void split_into_partitions(int this_lattice) {
     if (hila::check_input)
         return;
 
-    if (MPI_Comm_split(MPI_COMM_WORLD, this_lattice, 0, &(lattice.mpi_comm_lat)) !=
-        MPI_SUCCESS) {
+    if (MPI_Comm_split(MPI_COMM_WORLD, this_lattice, 0, &(lattice.mpi_comm_lat)) != MPI_SUCCESS) {
         hila::out0 << "MPI_Comm_split() call failed!\n";
         hila::finishrun();
     }
@@ -300,7 +299,6 @@ void split_into_partitions(int this_lattice) {
 /// Wait for the pack kernels and send data -- used in gpu code
 void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
 
-    hila::out0 << "wait and send " << data_vector.size() << '\n';
 
     for (auto &r : data_vector) {
         gpuStreamSynchronize(r.stream);
@@ -317,13 +315,10 @@ void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
 /// and wait for unpack streams
 void wait_unpack_halos(std::vector<gpuStream_t> &streams) {
 
-    hila::out0 << "wait unpack " << streams.size() << '\n';
-
-    for (auto & r : streams) {
+    for (auto &r : streams) {
         gpuStreamSynchronize(r);
         gpuStreamDestroy(r);
     }
-
 }
 
 #endif
