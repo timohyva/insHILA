@@ -214,7 +214,7 @@ inline void synchronize_threads() {}
 
 // define stream pool here
 
-#define N_GPU_STREAMS 4
+#define N_GPU_STREAMS 2
 extern gpuStream_t gpu_stream_pool[N_GPU_STREAMS];
 
 int next_gpu_stream_id();

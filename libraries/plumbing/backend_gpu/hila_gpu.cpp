@@ -211,6 +211,21 @@ void backend_lattice_struct::setup(lattice_struct &lattice) {
 #endif
 }
 
+
+#ifdef GPU_AWARE_MPI
+
+// define global gpu stream pool here
+
+gpuStream_t gpu_stream_pool[N_GPU_STREAMS];
+
+int next_gpu_stream_id() {
+    static int stream_id = 0;
+    stream_id = (stream_id + 1) % N_GPU_STREAMS;
+    return stream_id;
+}
+
+#endif
+
 void initialize_gpu(int rank) {
     int n_devices, my_device;
 
@@ -243,27 +258,16 @@ void initialize_gpu(int rank) {
 
 #ifdef GPU_AWARE_MPI
     // init streams
-    for (int i=0; i<N_GPU_STREAMS; i++) 
-        gpuStreamCreateWithFlags(&gpu_stream_pool[i],gpuStreamNonBlocking);
+    for (int i=0; i<N_GPU_STREAMS; i++) {
+        // gpuStreamCreateWithFlags(&gpu_stream_pool[i],gpuStreamNonBlocking);
+        gpuStreamCreate(&gpu_stream_pool[i]);
+    }
 
     hila::out0 << "Initializing GPU stream pool with " << N_GPU_STREAMS << " streams\n";
 
 #endif
 }
 
-#ifdef GPU_AWARE_MPI
-
-// define global gpu stream pool here
-
-gpuStream_t gpu_stream_pool[N_GPU_STREAMS];
-
-int next_gpu_stream_id() {
-    static int stream_id = 0;
-    stream_id = (stream_id + 1) % N_GPU_STREAMS;
-    return stream_id;
-}
-
-#endif
 
 
 

@@ -302,6 +302,7 @@ void split_into_partitions(int this_lattice) {
 /// Wait for the pack kernels and send data -- used in gpu code
 void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
 
+    hila::out << "Synch pack streams, nstreams " << data_vector.size() << " node " << hila::myrank() << std::endl;
 
     for (auto &r : data_vector) {
         gpuStreamSynchronize(gpu_stream_pool[r.stream_id]);
@@ -317,9 +318,14 @@ void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
 /// and wait for unpack streams
 void wait_unpack_halos(std::vector<int> &stream_ids) {
 
+    hila::out << "Sych unpack streams, nstreams " << stream_ids.size() << " node " << hila::myrank() << std::endl;
+
     for (auto &r : stream_ids) {
+        hila::out << "  node " << hila::myrank() << " stream " << r << std::endl;
         gpuStreamSynchronize(gpu_stream_pool[r]);
     }
+
+    hila::out << "-- synch done" << std::endl;
 }
 
 #endif
