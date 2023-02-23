@@ -45,6 +45,7 @@ static int n_float = 0;
 // static var holding the allreduce state
 static bool allreduce_on = true;
 
+
 void hila_reduce_double_setup(double *d, int n) {
 
     // ensure there's enough space
@@ -296,13 +297,14 @@ void split_into_partitions(int this_lattice) {
 
 #ifdef GPU_AWARE_MPI
 
+
+
 /// Wait for the pack kernels and send data -- used in gpu code
 void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
 
 
     for (auto &r : data_vector) {
-        gpuStreamSynchronize(r.stream);
-        gpuStreamDestroy(r.stream);
+        gpuStreamSynchronize(gpu_stream_pool[r.stream_id]);
 
         start_send_timer.start();
 
@@ -313,11 +315,10 @@ void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
 }
 
 /// and wait for unpack streams
-void wait_unpack_halos(std::vector<gpuStream_t> &streams) {
+void wait_unpack_halos(std::vector<int> &stream_ids) {
 
-    for (auto &r : streams) {
-        gpuStreamSynchronize(r);
-        gpuStreamDestroy(r);
+    for (auto &r : stream_ids) {
+        gpuStreamSynchronize(gpu_stream_pool[r]);
     }
 }
 

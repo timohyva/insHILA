@@ -13,12 +13,12 @@
 template <typename T>
 void Field<T>::field_struct::gather_comm_elements(Direction d, Parity par, T *RESTRICT buffer,
                                                   const lattice_struct::comm_node_struct &to_node
-                                                      IF_GPU_AWARE(gpuStream_t &stream)) const {
+                                                      IF_GPU_AWARE(int stream_id)) const {
 
 
 #if defined(CUDA) || defined(HIP)
 #ifdef GPU_AWARE_MPI
-    gpuStreamCreate(&stream);
+    gpuStream_t stream = gpu_stream_pool[stream_id];
 #else
     gpuStream_t stream = 0;
 #endif
@@ -92,7 +92,7 @@ void Field<T>::field_struct::gather_comm_elements(Direction d, Parity par, T *RE
 template <typename T>
 void Field<T>::field_struct::place_comm_elements(Direction d, Parity par, T *RESTRICT buffer,
                                                  const lattice_struct::comm_node_struct &from_node
-                                                     IF_GPU_AWARE(gpuStream_t &stream)) {
+                                                     IF_GPU_AWARE(int stream_id)) {
 
 #ifdef VECTORIZED
     if constexpr (hila::is_vectorizable_type<T>::value) {
@@ -108,9 +108,7 @@ void Field<T>::field_struct::place_comm_elements(Direction d, Parity par, T *RES
 #else
     // this one is only for CUDA
 #ifdef GPU_AWARE_MPI
-    gpuStreamCreate(&stream);
-
-    payload.place_comm_elements(d, par, buffer, from_node, lattice, stream);
+    payload.place_comm_elements(d, par, buffer, from_node, lattice, gpu_stream_pool[stream_id]);
 #else
     payload.place_comm_elements(d, par, buffer, from_node, lattice, 0);
 #endif
@@ -401,8 +399,12 @@ Field<T>::start_gather(Direction d,
         fs->gather_comm_elements(d, par, send_buffer, to_node);
 
 #else
-        gpuStream_t stream;
-        fs->gather_comm_elements(d, par, send_buffer, to_node, stream);
+        int stream_id = 0;
+        if (data_vector != nullptr) {
+            stream_id = next_gpu_stream_id();
+        }
+
+        fs->gather_comm_elements(d, par, send_buffer, to_node, stream_id);
 
         bool sendit = true;
         if (data_vector != nullptr) {
@@ -413,15 +415,14 @@ Field<T>::start_gather(Direction d,
             dlist.to_rank = to_node.rank;
             dlist.tag = tag;
             dlist.req = &fs->send_request[par_i][d];
-            dlist.stream = stream;
+            dlist.stream_id = stream_id;
             (*data_vector).push_back(dlist);
             sendit = false;
 
             //  hila::out0 << "Data gathered, buffering " << std::endl;
 
         } else {
-            gpuStreamSynchronize(stream);
-            gpuStreamDestroy(stream);
+            gpuStreamSynchronize(gpu_stream_pool[stream_id]);
         }
 
         if (sendit)
@@ -456,8 +457,7 @@ Field<T>::start_gather(Direction d,
 ///  the internal content of the field, the halo. From the point
 ///  of view of the user, the value of the field does not change.
 template <typename T>
-void Field<T>::wait_gather(Direction d,
-                           Parity p IF_GPU_AWARE(std::vector<gpuStream_t> *streams)) const {
+void Field<T>::wait_gather(Direction d, Parity p IF_GPU_AWARE(std::vector<int> *stream_ids)) const {
 
     lattice_struct::nn_comminfo_struct &ci = lattice.nn_comminfo[d];
     lattice_struct::comm_node_struct &from_node = ci.from_node;
@@ -528,14 +528,18 @@ void Field<T>::wait_gather(Direction d,
 
 #ifndef VANILLA
 #ifdef GPU_AWARE_MPI
-            gpuStream_t s;
+
+            int stream = 0;
+            if (stream_ids != nullptr) {
+                stream = next_gpu_stream_id();
+                stream_ids->push_back(stream);
+            }
+
             fs->place_comm_elements(d, par, fs->get_receive_buffer(d, par, from_node), from_node,
-                                    s);
-            if (streams != nullptr) {
-                (*streams).push_back(s);
-            } else {
-                gpuStreamSynchronize(s);
-                gpuStreamDestroy(s);
+                                    stream);
+
+            if (stream_ids == nullptr) {
+                gpuStreamSynchronize(gpu_stream_pool[stream]);
             }
 #else
             fs->place_comm_elements(d, par, fs->get_receive_buffer(d, par, from_node), from_node);

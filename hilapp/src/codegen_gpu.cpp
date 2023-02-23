@@ -86,33 +86,33 @@ std::string TopLevelVisitor::generate_code_cuda(Stmt *S, bool semicolon_at_end, 
             for (dir_ptr &d : l.dir_list)
                 if (d.count > 0) {
                     if (first && gpu_aware_mpi) {
-                        code << "std::vector<gpuStream_t> streams;\n";
+                        code << "std::vector<int> _unpack_streamids;\n";
                         first = false;
                     }
                     code << l.new_name << ".wait_gather(" << d.direxpr_s << ", "
                          << loop_info.parity_str;
                     if (gpu_aware_mpi)
-                        code << ", &streams";
+                        code << ", &_unpack_streamids";
 
                     code << ");\n";
                 }
         } else {
             if (first && gpu_aware_mpi) {
-                code << "std::vector<gpuStream_t> streams;\n";
+                code << "std::vector<int> _unpack_streamids;\n";
                 first = false;
             }
             code << "for (Direction _HILAdir_ = (Direction)0; _HILAdir_ < NDIRS; "
                     "++_HILAdir_) {\n"
                  << l.new_name << ".wait_gather(_HILAdir_," << loop_info.parity_str;
             if (gpu_aware_mpi)
-                code << ", &streams";
+                code << ", &_unpack_streamids";
 
             code << ");\n}\n";
         }
     }
 
     if (!first && gpu_aware_mpi) {
-        code << "wait_unpack_halos(streams);\n";
+        code << "wait_unpack_halos(_unpack_streamids);\n";
     }
 
     // Set loop lattice

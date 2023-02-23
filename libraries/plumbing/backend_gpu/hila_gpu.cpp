@@ -240,7 +240,34 @@ void initialize_gpu(int rank) {
     cudaMemPoolSetAttribute(mempool, cudaMemPoolAttrReleaseThreshold, &threshold);
 
 #endif
+
+#ifdef GPU_AWARE_MPI
+    // init streams
+    for (int i=0; i<N_GPU_STREAMS; i++) 
+        gpuStreamCreateWithFlags(&gpu_stream_pool[i],gpuStreamNonBlocking);
+
+    hila::out0 << "Initializing GPU stream pool with " << N_GPU_STREAMS << " streams\n";
+
+#endif
 }
+
+#ifdef GPU_AWARE_MPI
+
+// define global gpu stream pool here
+
+gpuStream_t gpu_stream_pool[N_GPU_STREAMS];
+
+int next_gpu_stream_id() {
+    static int stream_id = 0;
+    stream_id = (stream_id + 1) % N_GPU_STREAMS;
+    return stream_id;
+}
+
+#endif
+
+
+
+
 
 #ifdef CUDA
 

@@ -72,7 +72,9 @@ using gpuStream_t = cudaStream_t;
 #define gpuDeviceSynchronize() GPU_CHECK(cudaDeviceSynchronize())
 #define gpuStreamSynchronize(a) GPU_CHECK(cudaStreamSynchronize(a))
 #define gpuStreamCreate(a) GPU_CHECK(cudaStreamCreate(a))
+#define gpuStreamCreateWithFlags(a,b) GPU_CHECK(cudaStreamCreateWithFlags(a,b))
 #define gpuStreamDestroy(a) GPU_CHECK(cudaStreamDestroy(a))
+#define gpuStreamNonBlocking cudaStreamNonBlocking
 
 #define GPUTYPESTR "CUDA"
 
@@ -127,7 +129,9 @@ using gpuStream_t = hipStream_t;
 #define gpuDeviceSynchronize() GPU_CHECK(hipDeviceSynchronize())
 #define gpuStreamSynchronize(a) GPU_CHECK(hipStreamSynchronize(a))
 #define gpuStreamCreate(a) GPU_CHECK(hipStreamCreate(a))
+#define gpuStreamCreateWithFlags(a,b) GPU_CHECK(hipStreamCreateWithFlags(a,b))
 #define gpuStreamDestroy(a) GPU_CHECK(hipStreamDestroy(a))
+#define gpuStreamNonBlocking hipStreamNonBlocking
 
 #define GPUTYPESTR "HIP"
 
@@ -191,7 +195,9 @@ using gpuStream_t = int;
 #define gpuStreamSynchronize(a) do {} while(0)
 #define gpuDeviceSynchronize() do {} while(0)
 #define gpuStreamCreate(a) do {} while(0)
+#define gpuStreamCreateWithFlags(a,b) do {} while(0)
 #define gpuStreamDestroy(a) do {} while(0)
+
 // clang-format on
 
 
@@ -203,6 +209,17 @@ inline void synchronize_threads() {}
 
 #endif
 ////////////////////////////////////////////////////////////////////////////////////
+
+#ifdef GPU_AWARE_MPI
+
+// define stream pool here
+
+#define N_GPU_STREAMS 4
+extern gpuStream_t gpu_stream_pool[N_GPU_STREAMS];
+
+int next_gpu_stream_id();
+
+#endif
 
 void initialize_gpu(int rank);
 void gpu_device_info();
