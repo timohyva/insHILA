@@ -313,6 +313,8 @@ void wait_pack_and_send_halos(std::vector<send_data_list_t> &data_vector) {
 
         start_send_timer.stop();
     }
+
+    gpuDeviceSynchronize();
 }
 
 /// and wait for unpack streams
@@ -320,10 +322,12 @@ void wait_unpack_halos(std::vector<int> &stream_ids) {
 
     hila::out << "Sych unpack streams, nstreams " << stream_ids.size() << " node " << hila::myrank() << std::endl;
 
-    for (auto &r : stream_ids) {
-        hila::out << "  node " << hila::myrank() << " stream " << r << std::endl;
-        gpuStreamSynchronize(gpu_stream_pool[r]);
-    }
+    gpuDeviceSynchronize();
+
+    // for (auto &r : stream_ids) {
+    //     hila::out << "  node " << hila::myrank() << " stream " << r << std::endl;
+    //     gpuStreamSynchronize(gpu_stream_pool[r]);
+    // }
 
     hila::out << "-- synch done" << std::endl;
 }
