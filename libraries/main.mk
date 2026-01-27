@@ -88,20 +88,20 @@ ifndef ARCH
   $(error )
 endif
 
-.PRECIOUS: build/%.cpt build/%.o
+.PRECIOUS: build/CPTSource/%.cpt build/Targets/%.o
 
 HILA_OBJECTS = \
-	build/initialize.o \
-	build/input.o \
-	build/cmdline.o \
-	build/random.o \
-	build/lattice.o \
-	build/map_node_layout.o \
-	build/memalloc.o \
-	build/timing.o \
-	build/test_gathers.o \
-	build/com_mpi.o \
-	build/fft.o
+	build/Targets/initialize.o \
+	build/Targets/input.o \
+	build/Targets/cmdline.o \
+	build/Targets/random.o \
+	build/Targets/lattice.o \
+	build/Targets/map_node_layout.o \
+	build/Targets/memalloc.o \
+	build/Targets/timing.o \
+	build/Targets/test_gathers.o \
+	build/Targets/com_mpi.o \
+	build/Targets/fft.o
 
 # Remvoved com_simple.o, require MPI
 
@@ -121,7 +121,7 @@ ifdef LAYOUT_VECTOR
 	HILA_OBJECTS += build/setup_layout_vector.o
 	HILA_OPTS += -DSUBNODE_LAYOUT
 else
-	HILA_OBJECTS += build/setup_layout_generic.o
+	HILA_OBJECTS += build/Targets/setup_layout_generic.o
 endif
 
 # To force a full remake when changing platforms or targets
@@ -129,7 +129,7 @@ CLEANED_GOALS := $(shell echo ${MAKECMDGOALS} | sed -e 's/ /_/g' -e 's/\//+/g' |
 LASTMAKE := build/.lastmake.${CLEANED_GOALS}.${ARCH}
 
 $(LASTMAKE): $(MAKEFILE_LIST)
-	@mkdir -p build
+	@mkdir -p build/CPTSource build/Targets
 	-rm -f build/.lastmake.*
 	make clean
 	touch ${LASTMAKE}
@@ -197,27 +197,28 @@ endif
 # If your project has more complicated hierarcy, add the rules to the
 # project Makefile
 
-build/%.cpt: src/%.cpp Makefile $(MAKEFILE_LIST) $(ALL_DEPEND) $(APP_HEADERS)
+build/CPTSource/%.cpt: src/%.cpp Makefile $(MAKEFILE_LIST) $(ALL_DEPEND) $(APP_HEADERS)
 	@mkdir -p build
 	$(HILAPP) $(HILAPP_OPTS) $(APP_OPTS) $(HILA_OPTS) $< -o $@ $(HILAPP_TRAILING_OPTS)
 
-build/%.cpt: %.cpp Makefile $(MAKEFILE_LIST) $(ALL_DEPEND) $(APP_HEADERS)
+build/CPTSource/%.cpt: %.cpp Makefile $(MAKEFILE_LIST) $(ALL_DEPEND) $(APP_HEADERS)
 	@mkdir -p build
 	$(HILAPP) $(HILAPP_OPTS) $(APP_OPTS) $(HILA_OPTS) $< -o $@ $(HILAPP_TRAILING_OPTS)
 
-build/%.o : build/%.cpt
+build/Targets/%.o : build/CPTSource/%.cpt
 	$(CC) $(APP_OPTS) $(HILA_OPTS) $(CXXFLAGS) $< -c -o $@
 
-build/%.cpt: $(LIBRARIES_DIR)/plumbing/%.cpp $(ALL_DEPEND) $(HILA_HEADERS)
+
+build/CPTSource/%.cpt: $(LIBRARIES_DIR)/plumbing/%.cpp $(ALL_DEPEND) $(HILA_HEADERS)
 	@mkdir -p build
 	$(HILAPP) $(HILAPP_OPTS) $(APP_OPTS) $(HILA_OPTS) $< -o $@ $(HILAPP_TRAILING_OPTS)
 
-build/%.cpt: $(LIBRARIES_DIR)/tools/%.cpp $(ALL_DEPEND) $(HILA_HEADERS)
+build/CPTSource/%.cpt: $(LIBRARIES_DIR)/tools/%.cpp $(ALL_DEPEND) $(HILA_HEADERS)
 	@mkdir -p build
 	$(HILAPP) $(HILAPP_OPTS) $(APP_OPTS) $(HILA_OPTS) $< -o $@ $(HILAPP_TRAILING_OPTS)
 
 # This one triggers only for cuda targets
-build/%.cpt: $(LIBRARIES_DIR)/plumbing/backend_gpu/%.cpp $(ALL_DEPEND) $(HILA_HEADERS)
+build/CPTSource/%.cpt: $(LIBRARIES_DIR)/plumbing/backend_gpu/%.cpp $(ALL_DEPEND) $(HILA_HEADERS)
 	@mkdir -p build
 	$(HILAPP) $(HILAPP_OPTS) $(APP_OPTS) $(HILA_OPTS) $< -o $@ $(HILAPP_TRAILING_OPTS)
 
@@ -230,7 +231,7 @@ endif   # close the "clean" bracket
 .PHONY: clean cleanall
 
 clean:
-	-rm -f build/*.o build/*.cpt build/.lastmake* build/.git_sha_number*
+	-rm -fr build/*.o build/*.cpt build/.lastmake* build/.git_sha_number*
 
 cleanall:
-	-rm -f build/*
+	-rm -fr build/*
