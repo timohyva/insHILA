@@ -2,7 +2,7 @@
 
 # Give the location of the top level distribution directory wrt. this.
 # Can be absolute or relative
-HILA_DIR := ../..
+HILA_DIR := /projappl/project_2017849/Quann/libs/insHILA
 
 # Set default goal and arch
 .DEFAULT_GOAL := hila_healthcheck
@@ -24,6 +24,6 @@ include $(HILA_DIR)/libraries/main.mk
 
 hila_healthcheck: build/hila_healthcheck ; @:
 
-build/hila_healthcheck: Makefile build/hila_healthcheck.o $(HILA_OBJECTS) $(HEADERS) 
-	$(LD) -o $@ build/hila_healthcheck.o $(HILA_OBJECTS) $(LDFLAGS) $(LDLIBS)
+build/hila_healthcheck: Makefile build/Targets/hila_healthcheck.o $(HILA_OBJECTS) $(HEADERS) 
+	$(LD) -o $@ build/Targets/hila_healthcheck.o $(HILA_OBJECTS) $(LDFLAGS) $(LDLIBS)
 

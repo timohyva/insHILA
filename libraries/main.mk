@@ -104,6 +104,8 @@ HILA_OBJECTS = \
 	build/Targets/timing.o \
 	build/Targets/test_gathers.o \
 	build/Targets/com_mpi.o \
+	build/Targets/memory_pool.o \
+	build/Targets/extended.o \
 	build/Targets/fft.o
 
 # Remvoved com_simple.o, require MPI
@@ -228,11 +230,11 @@ build/CPTSource/%.cpt: $(LIBRARIES_DIR)/plumbing/backend_gpu/%.cpp $(ALL_DEPEND)
 	$(HILAPP) $(HILAPP_OPTS) $(APP_OPTS) $(HILA_OPTS) $< -o $@ $(HILAPP_TRAILING_OPTS)
 
 # Separate stanzas for extended, extended.cpp is compiled with no optimizations
-build/extended.cpt : $(LIBRARIES_DIR)/datatypes/extended.cpp $(HILA_HEADERS) $(ALL_DEPEND)
+build/CPTSource/extended.cpt : $(LIBRARIES_DIR)/datatypes/extended.cpp $(HILA_HEADERS) $(ALL_DEPEND)
 	@mkdir -p build
 	$(HILAPP) $(HILAPP_OPTS) $(APP_OPTS) $(HILA_OPTS) $< -o $@ $(HILAPP_TRAILING_OPTS)
 
-build/extended.o : build/extended.cpt
+build/Targets/extended.o : build/CPTSource/extended.cpt
 	$(CC) $(APP_OPTS) $(HILA_OPTS) $(CXXFLAGS_NOOPT) $< -c -o $@
 
 
@@ -245,7 +247,7 @@ endif   # close the "clean" bracket
 .PHONY: clean cleanall
 
 clean:
-	-rm -fr build/*.o build/*.cpt build/.lastmake* build/.git_sha_number*
+	-rm -fr build/Targets/*.o build/CPTSource/*.cpt build/.lastmake* build/.git_sha_number*
 
 cleanall:
 	-rm -fr build/*

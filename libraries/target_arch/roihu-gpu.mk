@@ -71,7 +71,7 @@ LDLIBS += $(if $(_shmem),-L$(NVSHMEM_DIR)/lib -lnvshmem_host -lnvshmem_device)
 LDLIBS += $(if $(_green),-lcuda)
 
 # extra cuda objects here
-HILA_OBJECTS += build/hila_gpu.o
+HILA_OBJECTS += build/Targets/hila_gpu.o
 
 ################
 
